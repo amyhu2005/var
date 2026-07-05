@@ -855,11 +855,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (chars.length > 5) return false;
     if (!chars.every(isAttachableChar)) return false;
     const ratio = sub.height / base.height;
-    if (sub.fontName === bodyFont) {
-      // Body-font subscripts: require a much clearer size reduction so we
-      // don't accidentally merge footnote numbers or inline letter pairs.
+    if (sub.fontName === bodyFont && base.fontName === bodyFont) {
+      // Both in body font: require strict size reduction to avoid merging
+      // footnote numbers or inline letter pairs into false variables.
       if (ratio > 0.68) return false;
     } else {
+      // Base is in a math font — subscripts get the lenient threshold.
       if (ratio > 0.85) return false;
     }
     const gap = sub.x - (base.x + base.width);
