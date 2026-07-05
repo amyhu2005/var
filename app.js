@@ -561,6 +561,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loadingOverlay.style.display = 'none';
   }
 
+  function showLowDetectionWarning(count) {
+    const existing = document.getElementById('low-detection-banner');
+    if (existing) existing.remove();
+    const banner = document.createElement('div');
+    banner.id = 'low-detection-banner';
+    banner.className = 'demo-banner';
+    banner.style.background = '#8c7b6b';
+    banner.innerHTML = `Only ${count || 'no'} variable${count === 1 ? '' : 's'} detected. If this paper has equations, try uploading the arXiv or SSRN preprint instead.
+      <button class="demo-banner-close" onclick="this.parentElement.remove()">✕</button>`;
+    readerView.insertBefore(banner, readerView.querySelector('.reader-scroll'));
+  }
+
   async function handleFileUpload(file) {
     if (!file || file.type !== 'application/pdf') {
       alert('Please upload a valid PDF document.');
@@ -1861,7 +1873,7 @@ Write ONE sentence (max 30 words): what the cited paper showed, and why it is ci
         return;
       }
       const cached = loadAIDefs();
-      if (cached) {
+      if (cached && Object.keys(cached.defs || {}).length >= 3) {
         Object.assign(variableDefinitions, cached.defs || {});
         Object.assign(variableTags, cached.tags || {});
         Object.assign(acronymDefinitions, cached.acrs || {});
@@ -1871,7 +1883,12 @@ Write ONE sentence (max 30 words): what the cited paper showed, and why it is ci
       } else {
         await resolveDefinitionsWithAI();
         await resolveRemainingVariables();
-        saveAIDefs();
+        const defCount = Object.keys(variableDefinitions).length;
+        if (defCount >= 3) {
+          saveAIDefs();
+        } else {
+          showLowDetectionWarning(defCount);
+        }
       }
     })();
   }
