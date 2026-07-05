@@ -885,9 +885,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sub.fontName !== bodyFont) {
       return isVariableLetterChar(chars[0]);
     }
-    // Same font as body: only pass Greek letters (α β γ τ σ etc.) —
-    // they are unambiguously mathematical and don't appear in English prose.
-    return isGreekLetter(chars[0]);
+    // Same font as body: Greek letters are unambiguously mathematical.
+    // Uppercase Latin (N, Y, X, …) are also safe — isolated uppercase letters
+    // in PDF text extraction are almost never prose (words get combined into
+    // multi-char items); standalone uppercase = variable in an equation.
+    return isGreekLetter(chars[0]) || isMathAlphanumericLetter(chars[0]) || /^[A-Z]$/.test(chars[0]);
   }
 
   // Shared geometry/font/content checks for "small glyph immediately
@@ -1080,9 +1082,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // a prose article/preposition that got flagged because the abstract is in italic.
     // Keep it only if there are subscripted variants (a_i, a_h, …) in the paper.
     function isFalsePositiveSingleLetter(norm) {
-      if (!/^[a-z]$/.test(norm)) return false; // only bare lowercase letters
-      const hasSubscriptSibling = [...allVarNorms].some(n => n.startsWith(norm + '_'));
-      return !hasSubscriptSibling;
+      // Single lowercase letter with no subscript siblings → almost always prose
+      if (/^[a-z]$/.test(norm)) {
+        const hasSubscriptSibling = [...allVarNorms].some(n => n.startsWith(norm + '_'));
+        return !hasSubscriptSibling;
+      }
+      // Single uppercase letter with no subscript siblings → likely abbreviation
+      // Keep it if it has subscript siblings (N_ct, Y_it, …) or appears with
+      // a superscript variant (N_NT), otherwise remove.
+      if (/^[A-Z]$/.test(norm)) {
+        const hasRelatedNorm = [...allVarNorms].some(n => n !== norm && n.startsWith(norm + '_'));
+        return !hasRelatedNorm;
+      }
+      return false;
     }
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
