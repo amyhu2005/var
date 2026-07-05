@@ -1103,6 +1103,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return !isFalsePositiveSingleLetter(t.norm);
       });
     }
+
+    // Debug hook — inspect in console: window._varDebug
+    window._varDebug = {
+      bodyFont: documentBodyFont,
+      perPageTokens,
+      pageRenderTokens,
+      allVarNorms: new Set(Object.values(perPageTokens).flat().filter(t=>t.type==='variable').map(t=>t.norm)),
+    };
+    const totalRender = Object.values(pageRenderTokens).flat().filter(t=>t.type==='variable').length;
+    const totalRaw = Object.values(perPageTokens).flat().filter(t=>t.type==='variable').length;
+    console.log(`[Var debug] body font: ${documentBodyFont} | raw tokens: ${totalRaw} | after filter: ${totalRender}`);
+    console.log('[Var debug] page render counts:', Object.fromEntries(Object.entries(pageRenderTokens).map(([p,ts])=>[p, ts.filter(t=>t.type==='variable').length]).filter(([,n])=>n>0)));
   }
 
   // ── AI Definition Resolution (DeepSeek via server proxy) ────────────────────
