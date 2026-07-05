@@ -900,14 +900,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (chars.length > 5) return false;
     if (!chars.every(isAttachableChar)) return false;
     const ratio = sub.height / base.height;
-    if (sub.fontName === bodyFont && base.fontName === bodyFont) {
-      // Both in body font: require strict size reduction to avoid merging
-      // footnote numbers or inline letter pairs into false variables.
-      if (ratio > 0.68) return false;
-    } else {
-      // Base is in a math font — subscripts get the lenient threshold.
-      if (ratio > 0.85) return false;
-    }
+    // Superscript/footnote markers are already excluded by the vertical
+    // position check in isSubscriptAttachable, so the height ratio only
+    // needs to separate true subscripts (~0.65–0.80) from same-size
+    // adjacent letters (~1.0). Use 0.82 uniformly.
+    if (ratio > 0.82) return false;
     const gap = sub.x - (base.x + base.width);
     if (gap > 0.6 * base.height || gap < -0.2 * base.height) return false;
     return true;
@@ -1100,6 +1097,9 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       pageRenderTokens[pageNum] = perPageTokens[pageNum].filter(t => {
         if (t.type === 'acronym') return verifiedAcronyms.has(t.norm);
+        // If the base character is in a non-body font it's already screened as
+        // a math-context variable — skip the false-positive filter entirely.
+        if (t.parts[0]?.fontName !== documentBodyFont) return true;
         return !isFalsePositiveSingleLetter(t.norm);
       });
     }
