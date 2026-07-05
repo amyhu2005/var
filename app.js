@@ -1842,8 +1842,23 @@ Write ONE sentence (max 30 words): what the cited paper showed, and why it is ci
     // so returning users see their edits right away.
     applyCustomDefs();
 
-    // Run both AI passes sequentially (or restore from localStorage cache).
+    // Run both AI passes sequentially (or restore from cache).
+    // Demo paper uses a pre-baked JSON so it never hits the AI API.
     (async () => {
+      if (currentPaperFilename === 'demo.pdf') {
+        try {
+          const res = await fetch('/demo-analysis.json');
+          const data = await res.json();
+          Object.assign(variableDefinitions, data.defs || {});
+          Object.assign(variableTags, data.tags || {});
+          Object.assign(acronymDefinitions, data.acrs || {});
+          applyCustomDefs();
+          updateAPIStatus(true, Object.keys(variableDefinitions).length);
+        } catch (err) {
+          console.error('[Var] failed to load demo analysis:', err);
+        }
+        return;
+      }
       const cached = loadAIDefs();
       if (cached) {
         Object.assign(variableDefinitions, cached.defs || {});
