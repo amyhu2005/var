@@ -879,17 +879,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return code >= 0x0370 && code <= 0x03FF;
   }
 
-  function isVariableBase(sub, bodyFont) {
+  function isVariableBase(sub, bodyFont, equationLine = false) {
     const chars = Array.from(sub.text);
     if (chars.length !== 1) return false;
     if (sub.fontName !== bodyFont) {
       return isVariableLetterChar(chars[0]);
     }
-    // Same font as body: Greek letters are unambiguously mathematical.
-    // Uppercase Latin (N, Y, X, …) are also safe — isolated uppercase letters
-    // in PDF text extraction are almost never prose (words get combined into
-    // multi-char items); standalone uppercase = variable in an equation.
-    return isGreekLetter(chars[0]) || isMathAlphanumericLetter(chars[0]) || /^[A-Z]$/.test(chars[0]);
+    // Same font as body: Greek letters and uppercase Latin are safe.
+    // On equation lines, also allow lowercase Latin — many publishers
+    // extract Greek/italic vars as ASCII (α→'a', β→'b', γ→'g') in body font.
+    const ch = chars[0];
+    if (isGreekLetter(ch) || isMathAlphanumericLetter(ch) || /^[A-Z]$/.test(ch)) return true;
+    if (equationLine && /^[a-z]$/.test(ch)) return true;
+    return false;
   }
 
   // Shared geometry/font/content checks for "small glyph immediately
@@ -941,6 +943,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     stream.sort((a, b) => a.x - b.x);
 
+    // A line is an equation line if it has a standalone '=' and at least
+    // 3 single-character items — enables lowercase Latin detection in body font.
+    const mathOpSet = new Set(['=', '+', '−', '–', '-', '±']);
+    const singles = stream.filter(s => s.text.trim().length === 1);
+    const equationLine = singles.some(s => mathOpSet.has(s.text.trim())) && singles.length >= 3;
+
     const consumed = new Array(stream.length).fill(false);
     const tokens = [];
     for (let i = 0; i < stream.length; i++) {
@@ -949,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (sub.forcedNorm) {
         tokens.push({ type: 'variable', norm: sub.forcedNorm, display: sub.text, parts: [sub] });
         consumed[i] = true;
-      } else if (isVariableBase(sub, bodyFont)) {
+      } else if (isVariableBase(sub, bodyFont, equationLine)) {
         const base = sub;
         let norm = base.text;
         let display = base.text;
@@ -975,7 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
             break;
           }
         }
-        tokens.push({ type: 'variable', norm, display, parts });
+        tokens.push({ type: 'variable', norm, display, parts, equationLine });
       } else if (sub.fontName === bodyFont && isCandidateAcronym(sub.text)) {
         tokens.push({ type: 'acronym', norm: sub.text.replace(/s$/, ''), display: sub.text, parts: [sub] });
         consumed[i] = true;
@@ -1097,9 +1105,9 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       pageRenderTokens[pageNum] = perPageTokens[pageNum].filter(t => {
         if (t.type === 'acronym') return verifiedAcronyms.has(t.norm);
-        // If the base character is in a non-body font it's already screened as
-        // a math-context variable — skip the false-positive filter entirely.
+        // Non-body font or equation-line context: skip false-positive filter.
         if (t.parts[0]?.fontName !== documentBodyFont) return true;
+        if (t.equationLine) return true;
         return !isFalsePositiveSingleLetter(t.norm);
       });
     }
