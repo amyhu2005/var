@@ -94,6 +94,37 @@ document.addEventListener('DOMContentLoaded', () => {
   infoClose.addEventListener('click', () => infoOverlay.classList.remove('open'));
   infoOverlay.addEventListener('click', e => { if (e.target === infoOverlay) infoOverlay.classList.remove('open'); });
 
+  // Bug report modal
+  const bugOverlay = document.getElementById('bug-modal-overlay');
+  const bugDesc    = document.getElementById('bug-description');
+  document.getElementById('bug-report-btn').addEventListener('click', () => {
+    bugDesc.value = '';
+    bugOverlay.style.display = 'flex';
+    bugDesc.focus();
+  });
+  document.getElementById('bug-modal-close').addEventListener('click', () => bugOverlay.style.display = 'none');
+  bugOverlay.addEventListener('click', e => { if (e.target === bugOverlay) bugOverlay.style.display = 'none'; });
+  document.getElementById('bug-modal-submit').addEventListener('click', async () => {
+    const desc = bugDesc.value.trim();
+    if (!desc) return;
+    const btn = document.getElementById('bug-modal-submit');
+    btn.textContent = 'Sending…';
+    btn.disabled = true;
+    try {
+      await supabaseClient.from('bug_reports').insert({
+        description: desc,
+        paper: currentPaperFilename || null,
+      });
+      bugDesc.value = '';
+      btn.textContent = 'Sent!';
+      setTimeout(() => { bugOverlay.style.display = 'none'; btn.textContent = 'Send report'; btn.disabled = false; }, 1200);
+    } catch (err) {
+      btn.textContent = 'Send report';
+      btn.disabled = false;
+      alert('Could not send report: ' + err.message);
+    }
+  });
+
   document.querySelectorAll('.info-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.info-tab').forEach(t => t.classList.remove('active'));

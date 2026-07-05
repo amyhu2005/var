@@ -88,9 +88,7 @@
       <button class="info-btn" id="info-btn">
         <span style="font-size:0.9rem; opacity:0.6;">ⓘ</span> How it works
       </button>
-      <a class="bug-btn" href="https://github.com/amyhu2005/var/issues/new" target="_blank" rel="noopener">
-        Report a bug
-      </a>
+      <button class="bug-btn" id="bug-report-btn">Report a bug</button>
 
     </aside>
 
@@ -263,6 +261,20 @@
 
     </main>
 
+  </div>
+
+  <!-- Bug Report Modal -->
+  <div class="bug-modal-overlay" id="bug-modal-overlay" style="display:none;">
+    <div class="bug-modal">
+      <button class="bug-modal-close" id="bug-modal-close">✕</button>
+      <h3>Report a bug</h3>
+      <p class="bug-modal-sub">What went wrong?</p>
+      <textarea id="bug-description" placeholder="Describe the issue — what you did, what you expected, what happened instead." rows="5"></textarea>
+      <div class="bug-modal-footer">
+        <span class="bug-modal-note">Anonymous — no account needed</span>
+        <button class="bug-modal-submit" id="bug-modal-submit">Send report</button>
+      </div>
+    </div>
   </div>
 
   <!-- Load papers database, then main controller -->
