@@ -129,6 +129,33 @@ body {
 }
 
 /* Info bar — sits at the bottom of the sidebar */
+.bug-btn {
+  position: absolute;
+  bottom: 44px;
+  left: 0;
+  right: 0;
+  height: 36px;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-family: var(--font-sans);
+  opacity: 0.7;
+  transition: all 0.15s;
+}
+.bug-btn:hover {
+  opacity: 1;
+  background: var(--bg-card);
+  color: var(--text-main);
+}
+
 .info-btn {
   position: absolute;
   bottom: 0;
