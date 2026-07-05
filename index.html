@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Var - Interactive Academic Paper Annotator</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+  <!-- KaTeX for LaTeX math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <!-- PDF.js for client-side PDF extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <!-- Supabase for auth -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+  <div class="app-container">
+
+    <!-- LEFT SIDEBAR: Controls & Preferences -->
+    <aside class="sidebar">
+
+      <!-- Brand Logo — click to go home -->
+      <div class="brand" id="brand-home-btn" style="cursor:pointer;" title="Back to Library">
+        <img src="logo.png" class="brand-logo-img" alt="var logo">
+        <h1 class="brand-title">var</h1>
+      </div>
+
+      <!-- Toggles Card -->
+      <div class="sidebar-section">
+        <h2 class="sidebar-title">Reading Layers</h2>
+        <div class="control-card">
+          <div class="toggle-group">
+
+            <label class="toggle-item">
+              <div>
+                <div class="toggle-label">Variables</div>
+                <div class="toggle-description">Highlight model variables</div>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggle-variables" checked>
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-item">
+              <div>
+                <div class="toggle-label">Citations</div>
+                <div class="toggle-description">Context summaries for sources</div>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggle-citations" checked>
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-item">
+              <div>
+                <div class="toggle-label">Definitions</div>
+                <div class="toggle-description">Double-click word dictionary</div>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggle-definitions" checked>
+                <span class="slider"></span>
+              </div>
+            </label>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Dictionary Definition Panel -->
+      <div class="sidebar-section" id="dictionary-section">
+        <h2 class="sidebar-title">Quick Dictionary</h2>
+        <div class="control-card" id="dictionary-card">
+          <div class="inspector-title" id="dict-word">No Word Selected</div>
+          <div class="inspector-body" id="dict-definition">
+            Double-click on any word in the text to look up its definition instantly.
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Info Button -->
+      <button class="info-btn" id="info-btn">
+        <span style="font-size:0.9rem; opacity:0.6;">ⓘ</span> How it works
+      </button>
+
+    </aside>
+
+    <!-- Info Modal -->
+    <div class="info-modal-overlay" id="info-modal-overlay">
+      <div class="info-modal">
+        <button class="info-modal-close" id="info-modal-close">✕</button>
+
+        <!-- Tabs -->
+        <div class="info-tabs">
+          <button class="info-tab active" data-tab="costs">What it costs</button>
+          <button class="info-tab" data-tab="how">How it works</button>
+        </div>
+
+        <!-- Tab: Costs (default) -->
+        <div class="info-tab-content" id="tab-costs">
+
+          <div class="info-section">
+            <h3>API costs per paper</h3>
+            <div class="cost-row">
+              <span class="cost-label">Variable definitions (first 8 pages → AI)</span>
+              <span class="cost-value">~$0.001</span>
+            </div>
+            <div class="cost-row">
+              <span class="cost-label">Each citation hover</span>
+              <span class="cost-value">~$0.0002</span>
+            </div>
+            <div class="cost-row">
+              <span class="cost-label">Typical session (paper + 20 citation hovers)</span>
+              <span class="cost-value">~$0.005</span>
+            </div>
+            <p class="cost-note">Don't worry, it's on me 😎</p>
+          </div>
+
+
+
+        </div>
+
+        <!-- Tab: How it works -->
+        <div class="info-tab-content" id="tab-how" style="display:none;">
+
+          <div class="info-section">
+            <h3>Variable Detection</h3>
+            <p>When you upload a PDF, var scans every page and computes the dominant body font. Any single letter rendered in a <em>different</em> font (typically a math italic or symbol font) is flagged as a candidate variable. Greek letters (τ, β, σ…) are always detected regardless of font. Subscripts are identified geometrically — a smaller glyph sitting to the right and below a base letter is merged in as a subscripted variant (e.g. <em>Y<sub>it</sub></em>). Variables with the same base letter share a color family; different subscripts get different shades.</p>
+          </div>
+
+          <div class="info-section">
+            <h3>⚠ Limitation: Image-Based Equations</h3>
+            <p>Some publisher PDFs (Elsevier, Springer, etc.) embed equations as images rather than text. var cannot read images — no variable detection or definition is possible for those equations. If you see very few highlights, this is likely why. <em>arXiv preprints</em> almost always use LaTeX-rendered text equations and work much better. When in doubt, use the arXiv version.</p>
+          </div>
+
+          <div class="info-section">
+            <h3>Variable Definitions</h3>
+            <p>After rendering, var sends the first 8 pages of text to DeepSeek AI, which reads the paper's setup section and returns a plain-English definition for each detected symbol. For variables first appearing after page 8, a second targeted pass finds their first occurrence anywhere in the paper and runs a separate AI query. Hover any highlighted variable to see its definition. Click the pencil icon to write your own notes — saved locally per paper.</p>
+          </div>
+
+          <div class="info-section">
+            <h3>Citation Detection</h3>
+            <p>Citations are detected two ways: (1) from PDF annotation links embedded by the publisher, and (2) by regex scanning for author-year patterns like <em>Smith (2020)</em> or <em>(Jones et al., 2021)</em>. Both handle Unicode names, hyphens, and multi-citation groups like <em>(A, 2020; B et al., 2021)</em>. Blue underlines mark detected citations.</p>
+          </div>
+
+          <div class="info-section">
+            <h3>Citation Analysis</h3>
+            <p>Hover any blue citation to get a one-sentence AI summary: what the cited paper found and why it's cited in that specific passage. var fetches the abstract from Semantic Scholar or CrossRef, then sends that plus ±1 page of surrounding context to DeepSeek. Results are cached — re-hovering the same citation is instant.</p>
+          </div>
+
+          <div class="info-section">
+            <h3>Past Papers</h3>
+            <p>Sign in with Google to save papers. Each uploaded PDF is stored in Supabase (cloud storage) so you can reopen any past paper with one click. Swipe left on a card to reveal the delete button.</p>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Resizable Drag Handle -->
+    <div class="resize-handle" id="sidebar-drag-handle"></div>
+
+    <!-- RIGHT/MIDDLE CONTENT AREA -->
+    <main class="main-content">
+
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div>
+          <button class="back-btn" id="back-to-dashboard" style="display: none;">
+            &larr; Back to Library
+          </button>
+        </div>
+
+        <div class="top-bar-right">
+          <div class="app-state-indicator">
+            <span id="api-status-dot" class="status-dot offline"></span>
+            <span id="api-status-text">Mock Mode (Offline)</span>
+          </div>
+          <div class="auth-area">
+            <button id="sign-in-btn" class="sign-in-btn">Sign in with Google</button>
+            <div id="user-info" class="user-info" style="display:none;">
+              <img id="user-avatar" class="user-avatar" src="" alt="">
+              <span id="user-name" class="user-name"></span>
+              <button id="sign-out-btn" class="sign-out-btn">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- SCREEN 1: Landing Dashboard -->
+      <section class="dashboard-screen" id="dashboard-view">
+        <div class="dashboard-center">
+
+          <div class="dashboard-headline">
+            <h1>Interactive Paper Reader</h1>
+            <p>Upload a research PDF or select a paper from the library to analyze variables, citations, and terminology
+              instantly.</p>
+          </div>
+
+          <!-- Drag and Drop Upload Box -->
+          <div class="upload-zone" id="drop-zone">
+            <div class="upload-icon">&#8682;</div>
+            <div>
+              <h3>Upload Academic Paper</h3>
+              <p>Drag and drop a PDF file here, or click to browse</p>
+            </div>
+            <input type="file" id="file-input" accept="application/pdf" style="display: none;">
+          </div>
+
+          <!-- Demo section -->
+          <div class="samples-section" id="demo-section">
+            <h3 class="samples-title">Start here</h3>
+            <div class="samples-grid">
+              <div class="sample-card demo-card" id="demo-paper-btn">
+                <div class="sample-info">
+                  <h4>Non-normal Empirical Bayes Prediction of Local Welfare</h4>
+                  <p>Elbers &amp; van der Weide · Journal of Development Economics · 2026</p>
+                  <p class="demo-label">Try the example →</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Past Papers -->
+          <div class="samples-section">
+            <h3 class="samples-title">Past Papers</h3>
+            <div class="samples-grid" id="past-papers-grid">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- SCREEN 2: Reader Screen (Loaded Paper) -->
+      <section class="reader-screen" id="reader-view">
+        <div class="demo-banner" id="demo-banner" style="display:none;">
+          <span class="demo-banner-text"></span>
+          <button class="demo-banner-close" id="demo-banner-close">✕</button>
+        </div>
+        <div class="reader-scroll">
+          <div class="reader-container" id="reader-container">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 3: Loading Overlay Screen -->
+      <section class="loading-screen" id="loading-overlay">
+        <div class="loader"></div>
+        <h3 id="loading-message">Reading document...</h3>
+        <p id="loading-submessage">This might take a moment.</p>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Load papers database, then main controller -->
+  <script src="app.js"></script>
+</body>
+
+</html>

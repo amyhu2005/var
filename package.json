@@ -1,0 +1,12 @@
+{
+  "name": "var",
+  "version": "1.0.0",
+  "description": "Interactive academic paper reader with AI-powered variable and citation analysis",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
