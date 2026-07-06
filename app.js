@@ -833,7 +833,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return lines;
   }
 
-  function flagExclusionZones(lines, refState) {
+  function flagExclusionZones(lines, refState, pageFraction) {
     lines.forEach(line => {
       const text = line.items.map(i => i.str).join(' ');
       const upperText = text.toUpperCase();
@@ -851,8 +851,18 @@ document.addEventListener('DOMContentLoaded', () => {
       // "preferences" contains "references"; "inferences" contains "ferences" etc.
       // Using includes() caused papers with those words to have every subsequent
       // page excluded.  Only trigger when the trimmed line IS the heading.
+      //
+      // A table of contents entry ("References ... 154") is frequently split
+      // into a standalone "References" text item by the PDF's own content
+      // stream (dot-leader/tab layout), independent of our own line-bucketing.
+      // That exactly matches this heading regex on page 1 or 2 of nearly every
+      // paper, latching inReferences permanently and killing detection for the
+      // entire rest of the document. Real bibliographies never start in a
+      // paper's opening pages, so require we're well past the front matter
+      // before trusting this heading.
       const stripped = text.trim().replace(/^[\d\s.]+/, '').trim(); // strip leading numbering
-      if (/^(references?|bibliography|works\s+cited|literature\s+cited)$/i.test(stripped) && line.items.length <= 5) {
+      if (/^(references?|bibliography|works\s+cited|literature\s+cited)$/i.test(stripped) && line.items.length <= 5
+          && pageFraction >= 0.3) {
         refState.inReferences = true;
       }
       if (refState.inReferences) exclusion = true;
@@ -1079,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const lines = buildLines(pagesItems[pageNum - 1]);
-      flagExclusionZones(lines, refState);
+      flagExclusionZones(lines, refState, pageNum / pdf.numPages);
       if (refState.inReferences) referencePageNums.add(pageNum);
 
       const tokens = [];
@@ -1110,6 +1120,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
       perPageTokens[pageNum] = tokens;
+    }
+
+    // Sanity check: a real references/bibliography section is a tail of the
+    // document, not the bulk of it. If our heading-detection latch somehow
+    // fires on a false positive again (this is the second time — see the
+    // "'preferences' falsely triggering References exclusion" fix), it would
+    // silently zero out detection for every remaining page with no visible
+    // symptom other than "nothing highlights." Surface it loudly instead.
+    if (referencePageNums.size > pdf.numPages * 0.5) {
+      console.warn(`[Var] SUSPICIOUS: ${referencePageNums.size}/${pdf.numPages} pages flagged as references — likely a false-positive heading match in flagExclusionZones, not an actual bibliography this long.`);
     }
 
     // Acronyms need corroborating evidence (repetition); variables don't,
