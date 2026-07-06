@@ -293,6 +293,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentUser) {
       // Not signed in — show nothing (or a sign-in nudge)
       pastPapersGrid.innerHTML = '<p class="papers-empty">Sign in to save and revisit your papers.</p>';
+      const demoSection = document.getElementById('demo-section');
+      if (demoSection) demoSection.style.display = '';
       return;
     }
 
@@ -306,8 +308,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!papers?.length) {
       pastPapersGrid.innerHTML = '<p class="papers-empty">No papers yet — upload one above.</p>';
+      const demoSection = document.getElementById('demo-section');
+      if (demoSection) demoSection.style.display = '';
       return;
     }
+
+    // User has their own papers — hide the "Start here" demo section
+    const demoSection = document.getElementById('demo-section');
+    if (demoSection) demoSection.style.display = 'none';
 
     papers.forEach(paper => addPaperCard(paper));
   }
@@ -879,15 +887,28 @@ document.addEventListener('DOMContentLoaded', () => {
     return code >= 0x0370 && code <= 0x03FF;
   }
 
+  // Zero-width and invisible Unicode chars that some PDF generators bundle
+  // with adjacent glyphs (e.g. "Δ​"), making a visually single character
+  // look like a 2-char string. Strip them before counting visible chars.
+  function visibleChars(str) {
+    return Array.from(str).filter(c => {
+      const cp = c.codePointAt(0);
+      return cp > 0x0008 && cp !== 0x00AD &&   // soft hyphen
+             (cp < 0x200B || cp > 0x200D) &&    // zero-width space/non-joiner/joiner
+             cp !== 0x2060 && cp !== 0xFEFF;     // word joiner / BOM
+    });
+  }
+
   function isVariableBase(sub, bodyFont, equationLine = false) {
-    const chars = Array.from(sub.text);
+    const chars = visibleChars(sub.text);
     if (chars.length !== 1) return false;
     if (sub.fontName !== bodyFont) {
       return isVariableLetterChar(chars[0]);
     }
     // Same font as body: Greek letters and uppercase Latin are safe.
     // On equation lines, also allow lowercase Latin — many publishers
-    // extract Greek/italic vars as ASCII (α→'a', β→'b', γ→'g') in body font.
+    // extract Greek/italic vars as ASCII (α→'a', β→'b', γ→'g') in body font,
+    // and some (Chicago Press JPE) use italic body font for math variables.
     const ch = chars[0];
     if (isGreekLetter(ch) || isMathAlphanumericLetter(ch) || /^[A-Z]$/.test(ch)) return true;
     if (equationLine && /^[a-z]$/.test(ch)) return true;
@@ -898,7 +919,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // adjacent to a base letter" — true for both subscripts (Y_i) and
   // superscripts (x^T), since they differ only in vertical position.
   function isSmallAdjacentGlyph(sub, base, bodyFont) {
-    const chars = Array.from(sub.text);
+    const chars = visibleChars(sub.text);
     if (chars.length > 5) return false;
     if (!chars.every(isAttachableChar)) return false;
     const ratio = sub.height / base.height;
@@ -943,11 +964,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     stream.sort((a, b) => a.x - b.x);
 
-    // A line is an equation line if it has a standalone '=' and at least
-    // 3 single-character items — enables lowercase Latin detection in body font.
-    const mathOpSet = new Set(['=', '+', '−', '–', '-', '±']);
-    const singles = stream.filter(s => s.text.trim().length === 1);
-    const equationLine = singles.some(s => mathOpSet.has(s.text.trim())) && singles.length >= 3;
+    // A line is an equation line if it looks like math notation:
+    // either has a standard operator with ≥3 singles, OR has ≥5 singles
+    // regardless (catches publisher PDFs that encode '=' as a non-standard
+    // glyph like '5' in a custom font — still produces many lone single chars).
+    const mathOpSet = new Set(['=', '+', '−', '–', '-', '±', '<', '>',
+                               '≤', '≥', '≡', '≈', '∝', '∈', '∉', '⊂', '∩', '∪']);
+    const singles = stream.filter(s => {
+      const t = s.text.trim();
+      return t.length === 1 || visibleChars(s.text).length === 1;
+    });
+    const equationLine = singles.length >= 5 ||
+      (singles.some(s => mathOpSet.has(s.text.trim())) && singles.length >= 3);
 
     const consumed = new Array(stream.length).fill(false);
     const tokens = [];
