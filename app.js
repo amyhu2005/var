@@ -839,10 +839,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const upperText = text.toUpperCase();
       let exclusion = false;
 
-      if (text === upperText && text.length > 5 && !/[0-9]/.test(text) && line.items.length < 10) {
+      // Only exclude genuinely prose all-caps headings, not equation content.
+      // Guard: if there are Greek/math chars the line is likely an equation.
+      const hasNonAscii = Array.from(text).some(c => c.codePointAt(0) > 127);
+      if (text === upperText && text.length > 5 && !/[0-9]/.test(text)
+          && line.items.length < 10 && !hasNonAscii) {
         exclusion = true; // ALL-CAPS heading
       }
-      if (upperText.includes("REFERENCES") && line.items.length < 4) refState.inReferences = true;
+
+      // Must be an EXACT match for the section heading word — not a substring.
+      // "preferences" contains "references"; "inferences" contains "ferences" etc.
+      // Using includes() caused papers with those words to have every subsequent
+      // page excluded.  Only trigger when the trimmed line IS the heading.
+      const stripped = text.trim().replace(/^[\d\s.]+/, '').trim(); // strip leading numbering
+      if (/^(references?|bibliography|works\s+cited|literature\s+cited)$/i.test(stripped) && line.items.length <= 5) {
+        refState.inReferences = true;
+      }
       if (refState.inReferences) exclusion = true;
       if (/^(Table|Figure|Fig\.|Panel)\s*\d+/i.test(text) || upperText.includes("ARTICLE INFO") || upperText.includes("ABSTRACT") || upperText.includes("JEL") || upperText.includes("KEYWORDS")) {
         exclusion = true;
@@ -964,17 +976,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     stream.sort((a, b) => a.x - b.x);
 
-    // A line is an equation line if it looks like math notation:
-    // either has a standard operator with ≥3 singles, OR has ≥5 singles
-    // regardless (catches publisher PDFs that encode '=' as a non-standard
-    // glyph like '5' in a custom font — still produces many lone single chars).
+    // Equation-line detection — any of these signals is sufficient:
+    // 1. ≥5 single-char items (publisher-agnostic: even '5'-encoded '=' lines qualify)
+    // 2. Standard math operator + ≥3 singles (the clean LaTeX case)
+    // 3. Any single Greek or Math-Alphanumeric char (unambiguous math signal —
+    //    no natural-language word is a single Greek letter)
     const mathOpSet = new Set(['=', '+', '−', '–', '-', '±', '<', '>',
-                               '≤', '≥', '≡', '≈', '∝', '∈', '∉', '⊂', '∩', '∪']);
+                               '≤', '≥', '≡', '≈', '∝', '∈', '∉', '⊂', '∩', '∪',
+                               '∑', '∏', '∫', '∂', '∇', '×', '·', '/', '|']);
     const singles = stream.filter(s => {
       const t = s.text.trim();
       return t.length === 1 || visibleChars(s.text).length === 1;
     });
-    const equationLine = singles.length >= 5 ||
+    const hasGreekOrMathChar = singles.some(s => {
+      const ch = visibleChars(s.text)[0];
+      return ch && (isGreekLetter(ch) || isMathAlphanumericLetter(ch));
+    });
+    const equationLine = singles.length >= 5 || hasGreekOrMathChar ||
       (singles.some(s => mathOpSet.has(s.text.trim())) && singles.length >= 3);
 
     const consumed = new Array(stream.length).fill(false);
