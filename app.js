@@ -1151,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalRaw = Object.values(perPageTokens).flat().filter(t=>t.type==='variable').length;
     console.log(`[Var debug] body font: ${documentBodyFont} | raw tokens: ${totalRaw} | after filter: ${totalRender}`);
     console.log('[Var debug] page render counts:', Object.fromEntries(Object.entries(pageRenderTokens).map(([p,ts])=>[p, ts.filter(t=>t.type==='variable').length]).filter(([,n])=>n>0)));
+    console.log('[Var debug] sample norms per page:', Object.fromEntries(Object.entries(pageRenderTokens).map(([p,ts])=>[p, ts.filter(t=>t.type==='variable').slice(0,8).map(t=>`${t.norm}(${t.parts[0]?.fontName})`)]).filter(([,ns])=>ns.length>0)));
   }
 
   // ── AI Definition Resolution (DeepSeek via server proxy) ────────────────────
@@ -1771,7 +1772,7 @@ Write ONE sentence (max 30 words): what the cited paper showed, and why it is ci
     if (!pdfjsLib) {
       throw new Error('PDF.js library failed to load.');
     }
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
